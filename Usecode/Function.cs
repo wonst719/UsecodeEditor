@@ -38,7 +38,10 @@ namespace Usecode
             Size = br.ReadUInt16();
             Data = new byte[Size];
             br.Read(Data);
-            _outWriter?.WriteLine($"__FUNC__ Pos: {Pos}, Id: {Id:X}, Size: {Size}");
+            if (!UsecodeConfig.ExportStringOnly && !UsecodeConfig.ExportCsv)
+            {
+                _outWriter?.WriteLine($"__FUNC__ Pos: {Pos}, Id: {Id:X}, Size: {Size}");
+            }
         }
 
         public void Disassemble()
@@ -52,7 +55,14 @@ namespace Usecode
             while (ptr.Length > 0)
             {
                 int splitterPos = ptr.IndexOf((byte)0);
-                _outWriter?.WriteLine($"Str: {UsecodeConfig.Encoding.GetString(ptr.Slice(0, splitterPos))}");
+                if (UsecodeConfig.ExportCsv)
+                {
+                    _outWriter?.WriteLine($"{Id:X4},{idx:D3},{pos:X4},\"{UsecodeConfig.Encoding.GetString(ptr.Slice(0, splitterPos)).Replace("\"", "\"\"")}\"");
+                }
+                else
+                {
+                    _outWriter?.WriteLine($"Str#{idx:D3}@[{Id:X4}:{pos:X4}]: {UsecodeConfig.Encoding.GetString(ptr.Slice(0, splitterPos))}");
+                }
                 Messages.Add(pos, new Message { Idx = idx++, Pos = pos, Data = ptr.Slice(0, splitterPos).ToArray() });
                 ptr = ptr.Slice(splitterPos + 1);
                 pos += splitterPos + 1;
@@ -70,13 +80,20 @@ namespace Usecode
         {
             Argc = br.ReadUInt16();
             Localc = br.ReadUInt16();
-            _outWriter?.WriteLine($"Argc: {Argc}, Localc: {Localc}");
+            if (!UsecodeConfig.ExportStringOnly)
+            {
+                _outWriter?.WriteLine($"Argc: {Argc}, Localc: {Localc}");
+            }
 
             int externSize = br.ReadUInt16();
             for (int i = 0; i < externSize; i++)
             {
                 Externs.Add(br.ReadUInt16());
-                _outWriter?.WriteLine($"Extern[{i}]: {Externs[Externs.Count - 1]:X}");
+
+                if (!UsecodeConfig.ExportStringOnly)
+                {
+                    _outWriter?.WriteLine($"Extern[{i}]: {Externs[Externs.Count - 1]:X}");
+                }
             }
 
             _codePos = br.BaseStream.Position;
@@ -96,35 +113,57 @@ namespace Usecode
                 case UsecodeOps.UC_ADDSI:
                 case UsecodeOps.UC_PUSHS:
                     long loc = br.BaseStream.Position - _codePos;
-                    _outWriter?.Write($"{br.BaseStream.Position - _codePos - 1:X} {opcode:X} {usecodeOp}");
+
+                    if (!UsecodeConfig.ExportStringOnly)
+                    {
+                        _outWriter?.Write($"{br.BaseStream.Position - _codePos - 1:X} {opcode:X} {usecodeOp}");
+                    }
                     var pos = br.ReadUInt16();
                     if (Messages.TryGetValue(pos, out var msg))
                     {
                         if (PatchLocMap.ContainsKey(msg.Idx))
                         {
-                            _outWriter?.WriteLine($" ERROR Dup {pos:X} \"{UsecodeConfig.Encoding.GetString(msg.Data)}\"");
+                            if (!UsecodeConfig.ExportCsv)
+                            {
+                                _outWriter?.WriteLine($" ERROR Dup {pos:X} \"{UsecodeConfig.Encoding.GetString(msg.Data)}\"");
+                            }
                         }
                         else
                         {
                             PatchLocMap.Add(msg.Idx, loc);
 
-                            _outWriter?.WriteLine($" STR {pos:X} ;\"{UsecodeConfig.Encoding.GetString(msg.Data)}\"");
+                            if (!UsecodeConfig.ExportStringOnly)
+                            {
+                                _outWriter?.WriteLine($" STR {pos:X} ;\"{UsecodeConfig.Encoding.GetString(msg.Data)}\"");
+                            }
                         }
                     }
                     else
                     {
-                        _outWriter?.WriteLine($" ERROR {pos:X}");
+                        if (!UsecodeConfig.ExportCsv)
+                        {
+                            _outWriter?.WriteLine($" ERROR {pos:X}");
+                        }
                         //throw new Exception();
                     }
                     break;
                 default:
-                    _outWriter?.Write($"{br.BaseStream.Position - _codePos - 1:X} {opcode:X} {usecodeOp}");
+                    if (!UsecodeConfig.ExportStringOnly)
+                    {
+                        _outWriter?.Write($"{br.BaseStream.Position - _codePos - 1:X} {opcode:X} {usecodeOp}");
+                    }
                     for (int i = 0; i < OpsBytes.ops[usecodeOp]; i++)
                     {
                         var b = br.ReadByte();
-                        _outWriter?.Write($" {b:X}");
+                        if (!UsecodeConfig.ExportStringOnly)
+                        {
+                            _outWriter?.Write($" {b:X}");
+                        }
                     }
-                    _outWriter?.WriteLine("");
+                    if (!UsecodeConfig.ExportStringOnly)
+                    {
+                        _outWriter?.WriteLine("");
+                    }
                     break;
             }
         }
