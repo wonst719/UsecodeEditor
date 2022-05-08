@@ -31,7 +31,7 @@ namespace Usecode
                 long msgPos = bw.BaseStream.Position - beginPos;
                 _messageLocList.Add(msgPos);
 
-                var bytes = Encoding.ASCII.GetBytes(Messages[i].Message);
+                var bytes = UsecodeConfig.Encoding.GetBytes(Messages[i].Message);
                 bw.Write(bytes);
                 bw.Write((byte)0);
             }

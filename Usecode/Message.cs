@@ -8,7 +8,7 @@
 
         public override string ToString()
         {
-            return System.Text.Encoding.ASCII.GetString(Data);
+            return UsecodeConfig.Encoding.GetString(Data);
         }
     }
 }

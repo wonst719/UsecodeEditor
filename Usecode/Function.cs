@@ -52,7 +52,7 @@ namespace Usecode
             while (ptr.Length > 0)
             {
                 int splitterPos = ptr.IndexOf((byte)0);
-                _outWriter?.WriteLine($"Str: {Encoding.ASCII.GetString(ptr.Slice(0, splitterPos))}");
+                _outWriter?.WriteLine($"Str: {UsecodeConfig.Encoding.GetString(ptr.Slice(0, splitterPos))}");
                 Messages.Add(pos, new Message { Idx = idx++, Pos = pos, Data = ptr.Slice(0, splitterPos).ToArray() });
                 ptr = ptr.Slice(splitterPos + 1);
                 pos += splitterPos + 1;
@@ -100,13 +100,21 @@ namespace Usecode
                     var pos = br.ReadUInt16();
                     if (Messages.TryGetValue(pos, out var msg))
                     {
-                        PatchLocMap.Add(msg.Idx, loc);
+                        if (PatchLocMap.ContainsKey(msg.Idx))
+                        {
+                            _outWriter?.WriteLine($" ERROR Dup {pos:X} \"{UsecodeConfig.Encoding.GetString(msg.Data)}\"");
+                        }
+                        else
+                        {
+                            PatchLocMap.Add(msg.Idx, loc);
 
-                        _outWriter?.WriteLine($" STR {pos:X} \"{Encoding.ASCII.GetString(msg.Data)}\"");
+                            _outWriter?.WriteLine($" STR {pos:X} ;\"{UsecodeConfig.Encoding.GetString(msg.Data)}\"");
+                        }
                     }
                     else
                     {
-                        throw new Exception();
+                        _outWriter?.WriteLine($" ERROR {pos:X}");
+                        //throw new Exception();
                     }
                     break;
                 default:
