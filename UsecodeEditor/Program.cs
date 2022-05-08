@@ -206,7 +206,6 @@ namespace UsecodeEditor
                 }
 
                 Rebuild(opts.OutputPath, functions);
-
             }
         }
 
