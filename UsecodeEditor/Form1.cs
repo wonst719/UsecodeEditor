@@ -34,7 +34,7 @@ namespace UsecodeEditor
             {
                 var func = reader.GetField<string>(0);
                 var idx = reader.GetField<int>(1);
-                var text = reader.GetField<string>(3);
+                var text = reader.GetField<string>(2);
 
                 var funcId = int.Parse(func, NumberStyles.HexNumber);
 
@@ -44,6 +44,9 @@ namespace UsecodeEditor
                 }
 
                 Debug.Assert(idx == dict[funcId].Count);
+
+                text = text.ReplaceLineEndings("\r\n");
+
                 dict[funcId].Add(text);
             }
 
