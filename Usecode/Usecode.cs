@@ -40,36 +40,5 @@ namespace Usecode
         {
             return _functions.Select(x => x.ToSerializable()).ToList();
         }
-
-        public void TestBuild(string filePath)
-        {
-            using (var fs = new FileStream(filePath, FileMode.Create, FileAccess.Write))
-            using (var bw = new BinaryWriter(fs))
-            {
-                foreach (var func in _functions)
-                {
-#if false
-                    var serializableFunction = func.ToSerializable();
-
-                    void SerializeJson()
-                    {
-                        var json = System.Text.Json.JsonSerializer.Serialize(serializableFunction);
-                        File.WriteAllText($"OUT_{serializableFunction.Id}.TXT", json);
-                    }
-                    SerializableFunction DeserializeJson()
-                    {
-                        var json = File.ReadAllText($"OUT_{serializableFunction.Id}.TXT");
-                        var obj = System.Text.Json.JsonSerializer.Deserialize<SerializableFunction>(json);
-                        return obj;
-                    }
-                    SerializeJson();
-                    var f = DeserializeJson();
-                    f.Build(bw);
-#else
-                    func.BuildFunction(bw);
-#endif
-                }
-            }
-        }
     }
 }

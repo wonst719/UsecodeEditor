@@ -44,6 +44,12 @@ namespace Usecode
             }
         }
 
+        private string NormalizeStringForExcelCsv(string s)
+        {
+            s = "'" + s;
+            return s.Replace("\"", "\"\"");
+        }
+
         public void Disassemble()
         {
             Span<byte> ptr = Data;
@@ -57,7 +63,7 @@ namespace Usecode
                 int splitterPos = ptr.IndexOf((byte)0);
                 if (UsecodeConfig.ExportCsv)
                 {
-                    _outWriter?.WriteLine($"{Id:X4},{idx:D3},{pos:X4},\"{UsecodeConfig.Encoding.GetString(ptr.Slice(0, splitterPos)).Replace("\"", "\"\"")}\"");
+                    _outWriter?.WriteLine($"'{Id:X4},'{idx:D3},'{pos:X4},\"{NormalizeStringForExcelCsv(UsecodeConfig.Encoding.GetString(ptr.Slice(0, splitterPos)))}\"");
                 }
                 else
                 {
@@ -144,7 +150,11 @@ namespace Usecode
                         {
                             _outWriter?.WriteLine($" ERROR {pos:X}");
                         }
-                        //throw new Exception();
+
+                        if (!UsecodeConfig.ExportStringOnly)
+                        {
+                            throw new Exception();
+                        }
                     }
                     break;
                 default:
