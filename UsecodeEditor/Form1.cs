@@ -34,7 +34,7 @@ namespace UsecodeEditor
             {
                 var func = reader.GetField<string>(0);
                 var idx = reader.GetField<int>(1);
-                var text = reader.GetField<string>(2);
+                var text = reader.GetField<string>(3);
 
                 var funcId = int.Parse(func, NumberStyles.HexNumber);
 
