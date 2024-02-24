@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 using CommandLine;
 using CsvHelper;
@@ -12,7 +13,7 @@ namespace UsecodeEditor
 {
     class Program
     {
-        private Dictionary<int, List<string>> LoadTranslation(string filePath)
+        private Dictionary<int, List<string>> LoadTranslation(string filePath, int translationColumnIdx)
         {
             using var sr = File.OpenText(filePath);
             using var reader = new CsvReader(sr, new CsvConfiguration(CultureInfo.CurrentCulture)
@@ -21,27 +22,64 @@ namespace UsecodeEditor
             });
 
             var dict = new Dictionary<int, List<string>>();
+            var patchDict = new Dictionary<int, List<string>>();
 
-            var header = reader.Read();
+            reader.Read();
+            var header = reader.ReadHeader();
 
             while (reader.Read())
             {
-                var func = reader.GetField<string>(0);
-                var idx = reader.GetField<int>(1);
-                var text = reader.GetField<string>(3);
-
-                var funcId = int.Parse(func, NumberStyles.HexNumber);
-
-                if (!dict.ContainsKey(funcId))
+                var func = reader.GetField<string>("Func");
+                int idx;
+                try
                 {
-                    dict.Add(funcId, new List<string>());
+                    idx = reader.GetField<int>("Idx");
+                }
+                catch
+                {
+                    continue;
                 }
 
-                Debug.Assert(idx == dict[funcId].Count);
+                var text = reader.GetField<string>(translationColumnIdx);
 
-                text = text.ReplaceLineEndings("\r\n");
+                // ÆÐÄ¡
+                if (func.StartsWith("P"))
+                {
+                    func = func.Substring(1);
 
-                dict[funcId].Add(text);
+                    var funcId = int.Parse(func, NumberStyles.HexNumber);
+
+                    if (!patchDict.ContainsKey(funcId))
+                    {
+                        patchDict.Add(funcId, new List<string>());
+                    }
+
+                    Debug.Assert(idx == patchDict[funcId].Count);
+
+                    text = text.ReplaceLineEndings("\r\n");
+
+                    patchDict[funcId].Add(text);
+                }
+                else
+                {
+                    var funcId = int.Parse(func, NumberStyles.HexNumber);
+
+                    if (!dict.ContainsKey(funcId))
+                    {
+                        dict.Add(funcId, new List<string>());
+                    }
+
+                    Debug.Assert(idx == dict[funcId].Count);
+
+                    text = text.ReplaceLineEndings("\r\n");
+
+                    dict[funcId].Add(text);
+                }
+            }
+
+            foreach (var patchFunc in patchDict)
+            {
+                dict[patchFunc.Key] = patchFunc.Value;
             }
 
             return dict;
@@ -91,7 +129,7 @@ namespace UsecodeEditor
                 usecode.Load("USECODE_BG");
                 var functions = usecode.ExportFunctions();
 
-                var translation = LoadTranslation("OUT_BG - OUT_BG.csv");
+                var translation = LoadTranslation("OUT_BG - OUT_BG.csv", 4);
 
                 UsecodeConfig.Encoding = CodePagesEncodingProvider.Instance.GetEncoding(949);
 
@@ -146,11 +184,17 @@ namespace UsecodeEditor
             [Option('u', Required = true, HelpText = "Original USECODE file path")]
             public string UsecodePath { get; set; }
 
+            [Option('p', Required = false, HelpText = "Patch USECODE file path")]
+            public string PatchUsecodePath { get; set; }
+
             [Option('t', Required = false, HelpText = "Translation CSV file path")]
             public string TranslationFilePath { get; set; }
 
             [Option('o', Required = true, HelpText = "Output file path")]
             public string OutputPath { get; set; }
+
+            [Option('c', Required = false, HelpText = "Translation Column Index (0-based)")]
+            public int TranslationColumnIdx { get; set; }
 
             [Option("original-encoding", Required = false, HelpText = "Original Encoding Codepage (Default: 437)")]
             public int UsecodeEncoding { get; set; } = 437;
@@ -172,26 +216,47 @@ namespace UsecodeEditor
                 using var bw = new StreamWriter(fs);
 
                 UsecodeConfig.Encoding = Encoding.GetEncoding(opts.UsecodeEncoding);
-                UsecodeConfig.ExportStringOnly = true;
-                UsecodeConfig.ExportCsv = true;
-
-                var usecode = new Usecode.Usecode(bw);
-                usecode.Load(opts.UsecodePath);
-            }
-            else
-            {
-                using var fs = new FileStream(opts.DumpPath, FileMode.Create, FileAccess.Write);
-                using var bw = new StreamWriter(fs);
-
-                UsecodeConfig.Encoding = Encoding.GetEncoding(opts.UsecodeEncoding);
                 UsecodeConfig.ExportStringOnly = false;
                 UsecodeConfig.ExportCsv = false;
 
                 var usecode = new Usecode.Usecode(bw);
                 usecode.Load(opts.UsecodePath);
                 var functions = usecode.ExportFunctions();
+            }
+            else
+            {
+                using var dumpFileStream = new FileStream(opts.DumpPath, FileMode.Create, FileAccess.Write);
+                using var dumpWriter = new StreamWriter(dumpFileStream);
 
-                var translation = LoadTranslation(opts.TranslationFilePath);
+                UsecodeConfig.Encoding = Encoding.GetEncoding(opts.UsecodeEncoding);
+                UsecodeConfig.ExportStringOnly = false;
+                UsecodeConfig.ExportCsv = false;
+
+                var usecode = new Usecode.Usecode(dumpWriter);
+                usecode.Load(opts.UsecodePath);
+                var functions = usecode.ExportFunctions();
+
+                if (!string.IsNullOrEmpty(opts.PatchUsecodePath))
+                {
+                    var patchUsecode = new Usecode.Usecode(dumpWriter);
+                    patchUsecode.Load(opts.PatchUsecodePath);
+                    var patchFunctions = patchUsecode.ExportFunctions();
+
+                    foreach (var func in patchFunctions)
+                    {
+                        var existingFunc = functions.FirstOrDefault(x => x.Id == func.Id);
+                        if (existingFunc != null)
+                        {
+                            functions.Remove(existingFunc);
+                        }
+
+                        functions.Add(func);
+                    }
+
+                    functions = functions.OrderBy(x => x.Id).ToList();
+                }
+
+                var translation = LoadTranslation(opts.TranslationFilePath, opts.TranslationColumnIdx);
 
                 UsecodeConfig.Encoding = Encoding.GetEncoding(opts.OutputEncoding);
 
@@ -213,7 +278,7 @@ namespace UsecodeEditor
         {
             var program = new Program();
             Parser.Default.ParseArguments<Options>(args).WithParsed(program.RunOptions);
-            // program.Test();
+            //program.Test();
         }
     }
 }

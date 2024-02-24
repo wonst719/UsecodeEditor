@@ -24,7 +24,7 @@ namespace Usecode
         Dictionary<long, Message> Messages = new Dictionary<long, Message>();
         private readonly StreamWriter _outWriter;
 
-        Dictionary<int, long> PatchLocMap = new Dictionary<int, long>();
+        List<(int, long)> PatchLocPairList = new List<(int, long)>();
 
         public Function(StreamWriter outWriter)
         {
@@ -127,21 +127,11 @@ namespace Usecode
                     var pos = br.ReadUInt16();
                     if (Messages.TryGetValue(pos, out var msg))
                     {
-                        if (PatchLocMap.ContainsKey(msg.Idx))
-                        {
-                            if (!UsecodeConfig.ExportCsv)
-                            {
-                                _outWriter?.WriteLine($" ERROR Dup {pos:X} \"{UsecodeConfig.Encoding.GetString(msg.Data)}\"");
-                            }
-                        }
-                        else
-                        {
-                            PatchLocMap.Add(msg.Idx, loc);
+                        PatchLocPairList.Add((msg.Idx, loc));
 
-                            if (!UsecodeConfig.ExportStringOnly)
-                            {
-                                _outWriter?.WriteLine($" STR {pos:X} ;\"{UsecodeConfig.Encoding.GetString(msg.Data)}\"");
-                            }
+                        if (!UsecodeConfig.ExportStringOnly)
+                        {
+                            _outWriter?.WriteLine($" STR {pos:X} ;\"{UsecodeConfig.Encoding.GetString(msg.Data)}\"");
                         }
                     }
                     else
@@ -202,7 +192,7 @@ namespace Usecode
             sf.ExternSeg = span.ToArray();
 
             sf.CodeSeg = Data.AsSpan().Slice((int)_codePos).ToArray();
-            sf.PatchLocList = PatchLocMap.OrderBy(x => x.Key).Select(x => x.Value).ToList();
+            sf.PatchLocList = PatchLocPairList.OrderBy(x => x.Item1).ToList();
             return sf;
         }
 

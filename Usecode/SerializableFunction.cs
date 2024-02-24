@@ -14,7 +14,7 @@ namespace Usecode
         public byte[] ExternSeg { get; set; }
         public byte[] CodeSeg { get; set; }
 
-        public List<long> PatchLocList { get; set; }
+        public List<(int, long)> PatchLocList { get; set; }
 
         private List<long> _messageLocList { get; set; } = new List<long>();
 
@@ -54,14 +54,13 @@ namespace Usecode
             bw.Write((ushort)(ExternSeg.Length / sizeof(ushort)));
             bw.Write(ExternSeg);
 
-            Debug.Assert(Messages.Count == PatchLocList.Count);
-
             // 패치
             Span<byte> codeSpan = CodeSeg;
-            for (int i = 0; i < Messages.Count; i++)
+            for (int i = 0; i < PatchLocList.Count; i++)
             {
-                var span = codeSpan.Slice((int)PatchLocList[i], 2);
-                BitConverter.TryWriteBytes(span, (ushort)_messageLocList[i]);
+                (int key, long value) = PatchLocList[i];
+                var span = codeSpan.Slice((int)value, 2);
+                BitConverter.TryWriteBytes(span, (ushort)_messageLocList[key]);
             }
 
             bw.Write(CodeSeg);
